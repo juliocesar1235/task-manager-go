@@ -1,0 +1,41 @@
+# Binaries for programs
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, should not go to repo
+*.test
+
+# Compiled Object files
+*.o
+*.cgo1.go
+*.cgo2.c
+*.cgo.c
+*.cgo.cc
+*.goc
+*.out
+*.a
+*.gcno
+*.gcda
+*.gceta
+*.e
+
+# Package files
+*.m
+*.z
+
+# IDE or editor-specific files and directories
+.idea/         # JetBrains IDEs (GoLand, etc)
+.vscode/       # VS Code
+.history/      # VS Code
+.sublime/      # Sublime Text
+.swp           # Vim swap files
+
+# Operating system files
+.DS_Store      # macOS
+Thumbs.db      # Windows
+
+# Environment files
+.env
