@@ -36,9 +36,9 @@ func main() {
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	taskStore := store.NewMemoryTaskStore()
-	// taskStoreWithDB := store.NewPgTaskStore(db)
-	taskHandler := handlers.NewTaskHandler(taskStore)
+	// taskStore := store.NewMemoryTaskStore()
+	taskStoreWithDB := store.NewPgTaskStore(db)
+	taskHandler := handlers.NewTaskHandler(taskStoreWithDB)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /tasks", taskHandler.CreateTask)

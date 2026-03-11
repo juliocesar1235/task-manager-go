@@ -35,7 +35,7 @@ func NewMemoryTaskStore() *MemoryTaskStore {
 type TaskStore interface {
 	Create(task *models.Task) error
 	Get(id string) (*models.Task, error)
-	GetAll() ([]models.Task, error)
+	GetAll() (*[]models.Task, error)
 	Update(id string, task *models.Task) error
 	Delete(id string) error
 }
@@ -46,6 +46,15 @@ func (s *MemoryTaskStore) Create(task *models.Task) error {
 
 	task.CreatedAt = time.Now()
 	s.tasks[task.ID] = *task
+	return nil
+}
+
+func (s *PgTaskStore) Create(task *models.Task) error {
+	task.CreatedAt = time.Now()
+	_, err := s.db.NamedExec("INSERT INTO tasks (id, title, status, created_at) VALUES (:id, :title, :status, :created_at)", &task)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -85,6 +94,18 @@ func (s *MemoryTaskStore) GetAll() ([]models.Task, error) {
 	return taskList, nil
 }
 
+func (s *PgTaskStore) GetAll() (*[]models.Task, error) {
+	var tasks []models.Task
+	err := s.db.Select(&tasks, "SELECT * FROM tasks ORDER BY created_at DESC")
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &tasks, nil
+}
+
 func (s *MemoryTaskStore) Update(id string, task *models.Task) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -93,9 +114,27 @@ func (s *MemoryTaskStore) Update(id string, task *models.Task) error {
 	if !ok {
 		return ErrTaskNotFound
 	}
-	task.UpdatedAt = time.Now()
+	now := time.Now()
+	task.UpdatedAt = &now
 	s.tasks[id] = *task
 
+	return nil
+}
+
+func (s *PgTaskStore) Update(id string, task *models.Task) error {
+	now := time.Now()
+	task.UpdatedAt = &now
+	result, err := s.db.NamedExec("UPDATE tasks SET title=:title, status=:status, updated_at=:updated_at WHERE id=:id", task)
+	if err != nil {
+		return err
+	}
+	numRows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if numRows == 0 {
+		return ErrTaskNotFound
+	}
 	return nil
 }
 
@@ -109,5 +148,21 @@ func (s *MemoryTaskStore) Delete(id string) error {
 	}
 
 	delete(s.tasks, id)
+	return nil
+}
+
+func (s *PgTaskStore) Delete(id string) error {
+	result, err := s.db.NamedExec("DELETE tasks WHERE id=:id", id)
+	if err != nil {
+		return err
+	}
+
+	numRows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if numRows == 0 {
+		return ErrTaskNotFound
+	}
 	return nil
 }
