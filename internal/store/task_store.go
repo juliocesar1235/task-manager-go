@@ -35,8 +35,8 @@ func NewMemoryTaskStore() *MemoryTaskStore {
 type TaskStore interface {
 	Create(task *models.Task) error
 	Get(id string) (*models.Task, error)
-	GetAll() (*[]models.Task, error)
-	Update(id string, task *models.Task) error
+	GetAll() ([]models.Task, error)
+	Update(id string, task *models.UpdateTaskInput) (*models.Task, error)
 	Delete(id string) error
 }
 
@@ -72,7 +72,7 @@ func (s *MemoryTaskStore) Get(id string) (*models.Task, error) {
 func (s *PgTaskStore) Get(id string) (*models.Task, error) {
 	var task models.Task
 	err := s.db.Get(&task, "SELECT * FROM tasks WHERE id = $1", id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrTaskNotFound
 	}
 	if err != nil {
@@ -94,16 +94,13 @@ func (s *MemoryTaskStore) GetAll() ([]models.Task, error) {
 	return taskList, nil
 }
 
-func (s *PgTaskStore) GetAll() (*[]models.Task, error) {
+func (s *PgTaskStore) GetAll() ([]models.Task, error) {
 	var tasks []models.Task
 	err := s.db.Select(&tasks, "SELECT * FROM tasks ORDER BY created_at DESC")
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
-	return &tasks, nil
+	return tasks, nil
 }
 
 func (s *MemoryTaskStore) Update(id string, task *models.Task) error {
@@ -121,21 +118,26 @@ func (s *MemoryTaskStore) Update(id string, task *models.Task) error {
 	return nil
 }
 
-func (s *PgTaskStore) Update(id string, task *models.Task) error {
+func (s *PgTaskStore) Update(id string, taskToUpdate *models.UpdateTaskInput) (*models.Task, error) {
 	now := time.Now()
-	task.UpdatedAt = &now
-	result, err := s.db.NamedExec("UPDATE tasks SET title=:title, status=:status, updated_at=:updated_at WHERE id=:id", task)
+	var task models.Task
+
+	err := s.db.QueryRowx(`
+		UPDATE tasks
+		SET
+			title = COALESCE($1, title),
+			status = COALESCE($2, status),
+			updated_at = $3
+		WHERE id = $4
+		RETURNING *
+	`, taskToUpdate.Title, taskToUpdate.Status, now, id).StructScan(&task)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrTaskNotFound
+	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-	numRows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if numRows == 0 {
-		return ErrTaskNotFound
-	}
-	return nil
+	return &task, nil
 }
 
 func (s *MemoryTaskStore) Delete(id string) error {
@@ -152,7 +154,7 @@ func (s *MemoryTaskStore) Delete(id string) error {
 }
 
 func (s *PgTaskStore) Delete(id string) error {
-	result, err := s.db.NamedExec("DELETE tasks WHERE id=:id", id)
+	result, err := s.db.Exec("DELETE FROM tasks WHERE id = $1", id)
 	if err != nil {
 		return err
 	}
