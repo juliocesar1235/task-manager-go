@@ -1,5 +1,5 @@
 FROM golang:1.26-alpine AS builder
-WORKDIR /app
+WORKDIR /app/cmd/server
 
 COPY go.mod go.sum ./
 RUN go mod download
@@ -14,8 +14,8 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 RUN apk --no-cache add ca-certificates
 
-WORKDIR /app
-COPY --from=builder /app/server .
+WORKDIR /app/cmd/server
+COPY --from=builder /app/cmd/server .
 
 USER appuser
 
